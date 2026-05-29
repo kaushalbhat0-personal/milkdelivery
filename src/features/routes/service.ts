@@ -1,5 +1,6 @@
 import { eq, and, isNull } from "drizzle-orm";
 import { db } from "@/lib/db";
+import { routeStops } from "@/lib/db/schema/route-stops";
 import { users } from "@/lib/db/schema/auth";
 import { customers } from "@/lib/db/schema/customers";
 import { getTenantId } from "@/lib/tenant";
@@ -298,9 +299,35 @@ export async function reorderStops(session: Session, routeId: string, input: Reo
     throw new Error("All stops must be included in reorder");
   }
 
-  for (let i = 0; i < stopIds.length; i++) {
-    await queries.updateStopSortOrderQuery(stopIds[i], routeId, i + 1);
-  }
+  const now = new Date();
+
+  await db.transaction(async (tx) => {
+    for (let i = 0; i < stopIds.length; i++) {
+      await tx
+        .update(routeStops)
+        .set({ sortOrder: -(i + 1), updatedAt: now })
+        .where(
+          and(
+            eq(routeStops.id, stopIds[i]),
+            eq(routeStops.routeId, routeId),
+            isNull(routeStops.deletedAt),
+          )
+        );
+    }
+
+    for (let i = 0; i < stopIds.length; i++) {
+      await tx
+        .update(routeStops)
+        .set({ sortOrder: i + 1, updatedAt: now })
+        .where(
+          and(
+            eq(routeStops.id, stopIds[i]),
+            eq(routeStops.routeId, routeId),
+            isNull(routeStops.deletedAt),
+          )
+        );
+    }
+  });
 
   return queries.getRouteStopsQuery(routeId, tenantId);
 }
