@@ -301,33 +301,31 @@ export async function reorderStops(session: Session, routeId: string, input: Reo
 
   const now = new Date();
 
-  await db.transaction(async (tx) => {
-    for (let i = 0; i < stopIds.length; i++) {
-      await tx
-        .update(routeStops)
-        .set({ sortOrder: -(i + 1), updatedAt: now })
-        .where(
-          and(
-            eq(routeStops.id, stopIds[i]),
-            eq(routeStops.routeId, routeId),
-            isNull(routeStops.deletedAt),
-          )
-        );
-    }
+  for (let i = 0; i < stopIds.length; i++) {
+    await db
+      .update(routeStops)
+      .set({ sortOrder: -(i + 1), updatedAt: now })
+      .where(
+        and(
+          eq(routeStops.id, stopIds[i]),
+          eq(routeStops.routeId, routeId),
+          isNull(routeStops.deletedAt),
+        )
+      );
+  }
 
-    for (let i = 0; i < stopIds.length; i++) {
-      await tx
-        .update(routeStops)
-        .set({ sortOrder: i + 1, updatedAt: now })
-        .where(
-          and(
-            eq(routeStops.id, stopIds[i]),
-            eq(routeStops.routeId, routeId),
-            isNull(routeStops.deletedAt),
-          )
-        );
-    }
-  });
+  for (let i = 0; i < stopIds.length; i++) {
+    await db
+      .update(routeStops)
+      .set({ sortOrder: i + 1, updatedAt: now })
+      .where(
+        and(
+          eq(routeStops.id, stopIds[i]),
+          eq(routeStops.routeId, routeId),
+          isNull(routeStops.deletedAt),
+        )
+      );
+  }
 
   return queries.getRouteStopsQuery(routeId, tenantId);
 }
