@@ -10,8 +10,11 @@ export const users = pgTable("users", {
   tenantId: uuid("tenant_id")
     .notNull()
     .references(() => tenants.id),
-  role: text("role", { enum: ["admin", "driver"] }).notNull(),
+  role: text("role").notNull().default("user"),
   phone: text("phone"),
+  banned: boolean("banned").notNull().default(false),
+  banReason: text("ban_reason"),
+  banExpires: timestamp("ban_expires"),
   createdAt: timestamp("created_at").notNull(),
   updatedAt: timestamp("updated_at").notNull(),
   deletedAt: timestamp("deleted_at"),
@@ -28,6 +31,7 @@ export const sessions = pgTable("sessions", {
   userId: text("user_id")
     .notNull()
     .references(() => users.id, { onDelete: "cascade" }),
+  impersonatedBy: text("impersonated_by"),
 });
 
 export const accounts = pgTable("accounts", {
