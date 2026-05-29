@@ -1,0 +1,15 @@
+User types in AddressAutocomplete input
+    ↓
+Debounced call to google.maps.places.AutocompleteService
+    ↓
+Predictions rendered in dropdown
+    ↓
+User selects a prediction
+    ↓
+google.maps.places.PlacesService.getDetails(placeId)
+    ↓
+onChange({ formattedAddress, placeId, latitude, longitude })
+    ↓
+customer-form.tsx react-hook-form setValue
+    ↓
+Existing validation + Server Action → DB
