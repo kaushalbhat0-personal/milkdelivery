@@ -25,8 +25,8 @@ export async function proxy(request: Request) {
     return Response.redirect(new URL("/login", request.url));
   }
 
-  const isAdminRoute = adminPaths.some((p) => pathname.startsWith(p));
-  const isDriverRoute = driverPaths.some((p) => pathname.startsWith(p));
+  const isAdminRoute = adminPaths.some((p) => pathname === p || pathname.startsWith(p + "/"));
+  const isDriverRoute = driverPaths.some((p) => pathname === p || pathname.startsWith(p + "/"));
 
   if (isAdminRoute && session.user.role !== ROLES.ADMIN) {
     return Response.redirect(new URL("/route", request.url));
