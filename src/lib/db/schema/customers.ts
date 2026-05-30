@@ -13,6 +13,8 @@ export const customers = pgTable("customers", {
   address: text("address").notNull(),
   landmark: text("landmark"),
   notes: text("notes"),
+  placeId: varchar("place_id", { length: 255 }),
+  formattedAddress: text("formatted_address"),
   latitude: decimal("latitude", { precision: 10, scale: 7 }),
   longitude: decimal("longitude", { precision: 10, scale: 7 }),
   housePhotoUrl: varchar("house_photo_url", { length: 500 }),

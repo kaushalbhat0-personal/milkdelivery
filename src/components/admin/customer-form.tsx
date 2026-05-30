@@ -16,6 +16,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent } from "@/components/ui/card"
+import { AddressAutocomplete } from "@/components/shared/address-autocomplete"
 
 interface CustomerFormProps {
   initialData?: CustomerRow
@@ -29,13 +30,17 @@ export function CustomerForm({ initialData }: CustomerFormProps) {
   const {
     register,
     handleSubmit,
+    setValue,
+    watch,
     formState: { errors },
   } = useForm<CreateCustomerInput>({
     resolver: zodResolver(createCustomerSchema) as unknown as Resolver<CreateCustomerInput>,
     defaultValues: {
       name: initialData?.name ?? "",
       phone: initialData?.phone ?? "",
-      address: initialData?.address ?? "",
+      address: (initialData?.formattedAddress ?? initialData?.address) ?? "",
+      placeId: initialData?.placeId ?? undefined,
+      formattedAddress: initialData?.formattedAddress ?? undefined,
       landmark: initialData?.landmark ?? "",
       notes: initialData?.notes ?? "",
       latitude: initialData?.latitude ? Number(initialData.latitude) : undefined,
@@ -43,6 +48,13 @@ export function CustomerForm({ initialData }: CustomerFormProps) {
       isActive: initialData?.isActive ?? true,
     },
   })
+
+  const selectedPlaceId = watch("placeId")
+  const selectedLat = watch("latitude")
+  const selectedLng = watch("longitude")
+  const currentAddress = watch("address")
+  const hasCoordinates = typeof selectedLat === "number" && typeof selectedLng === "number"
+  const hasValidSelection = !!selectedPlaceId || hasCoordinates
 
   async function onSubmit(data: CreateCustomerInput) {
     startTransition(async () => {
@@ -76,23 +88,45 @@ export function CustomerForm({ initialData }: CustomerFormProps) {
             <div className="space-y-2">
               <Label htmlFor="phone">Phone</Label>
               <Input id="phone" {...register("phone")} />
-              {errors.phone && (
-                <p className="text-sm text-destructive">{errors.phone.message}</p>
-              )}
             </div>
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="address">Address *</Label>
-            <textarea
+            <AddressAutocomplete
               id="address"
-              rows={2}
-              className="flex min-h-[60px] w-full rounded-lg border border-input bg-transparent px-2.5 py-2 text-sm transition-colors placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-50"
-              {...register("address")}
+              label="Address *"
+              value={watch("address")}
+              onChange={(result) => {
+                if (result) {
+                  setValue("address", result.formattedAddress, { shouldValidate: true })
+                  setValue("formattedAddress", result.formattedAddress)
+                  setValue("placeId", result.placeId)
+                  setValue("latitude", result.latitude)
+                  setValue("longitude", result.longitude)
+                } else {
+                  setValue("address", "", { shouldValidate: true })
+                  setValue("formattedAddress", undefined)
+                  setValue("placeId", undefined)
+                  setValue("latitude", undefined)
+                  setValue("longitude", undefined)
+                }
+              }}
+              onInputChange={(val) => {
+                setValue("address", val, { shouldValidate: true })
+              }}
+              error={
+                errors.address?.message
+                  ? errors.address.message
+                  : (!hasValidSelection && (currentAddress?.length ?? 0) > 0)
+                    ? "Please select a valid address from the suggestions"
+                    : undefined
+              }
             />
-            {errors.address && (
-              <p className="text-sm text-destructive">{errors.address.message}</p>
-            )}
+
+            <input type="hidden" {...register("placeId")} />
+            <input type="hidden" {...register("formattedAddress")} />
+            <input type="hidden" {...register("latitude", { setValueAs: (v) => (v === "" || v === undefined ? undefined : Number(v)) })} />
+            <input type="hidden" {...register("longitude", { setValueAs: (v) => (v === "" || v === undefined ? undefined : Number(v)) })} />
           </div>
 
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
@@ -108,37 +142,6 @@ export function CustomerForm({ initialData }: CustomerFormProps) {
                 className="flex min-h-[60px] w-full rounded-lg border border-input bg-transparent px-2.5 py-2 text-sm transition-colors placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-50"
                 {...register("notes")}
               />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-            <div className="space-y-2">
-              <Label htmlFor="latitude">Latitude</Label>
-              <Input
-                id="latitude"
-                type="number"
-                step="any"
-                {...register("latitude", {
-                  setValueAs: (v) => (v === "" ? undefined : Number(v)),
-                })}
-              />
-              {errors.latitude && (
-                <p className="text-sm text-destructive">{errors.latitude.message}</p>
-              )}
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="longitude">Longitude</Label>
-              <Input
-                id="longitude"
-                type="number"
-                step="any"
-                {...register("longitude", {
-                  setValueAs: (v) => (v === "" ? undefined : Number(v)),
-                })}
-              />
-              {errors.longitude && (
-                <p className="text-sm text-destructive">{errors.longitude.message}</p>
-              )}
             </div>
           </div>
 

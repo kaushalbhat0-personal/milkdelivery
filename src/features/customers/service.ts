@@ -38,9 +38,16 @@ export async function createCustomer(session: Session, input: CreateCustomerInpu
   const data = createCustomerSchema.parse(input);
 
   return queries.createCustomerQuery({
-    ...data,
+    name: data.name,
+    phone: data.phone,
+    address: data.address,
+    placeId: data.placeId,
+    formattedAddress: data.formattedAddress,
+    landmark: data.landmark,
+    notes: data.notes,
     latitude: data.latitude?.toString(),
     longitude: data.longitude?.toString(),
+    isActive: data.isActive,
     tenantId,
   });
 }
@@ -56,11 +63,20 @@ export async function updateCustomer(session: Session, id: string, input: Update
 
   const data = updateCustomerSchema.parse(input);
 
-  const updated = await queries.updateCustomerQuery(id, tenantId, {
-    ...data,
-    latitude: data.latitude?.toString(),
-    longitude: data.longitude?.toString(),
-  });
+  const updateData: Record<string, unknown> = {};
+  const fields: (keyof typeof data)[] = [
+    "name", "phone", "address", "placeId", "formattedAddress",
+    "landmark", "notes", "isActive",
+  ];
+  for (const field of fields) {
+    if (data[field] !== undefined) {
+      updateData[field] = data[field];
+    }
+  }
+  if (data.latitude !== undefined) updateData.latitude = data.latitude.toString();
+  if (data.longitude !== undefined) updateData.longitude = data.longitude.toString();
+
+  const updated = await queries.updateCustomerQuery(id, tenantId, updateData);
   if (!updated) {
     throw new Error("Failed to update customer");
   }
