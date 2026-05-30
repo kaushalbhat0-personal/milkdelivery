@@ -1,19 +1,39 @@
 "use server";
 
-import { auth } from "@/lib/auth";
-import { headers } from "next/headers";
-import type { Session } from "@/lib/auth-guards";
-import type { AppRole } from "@/config/roles";
+import { revalidateTag } from "next/cache";
+import { getSession } from "@/lib/session";
 import * as service from "./service";
-
-async function getSession(): Promise<Session> {
-  const result = await auth.api.getSession({ headers: await headers() });
-  if (!result) return null;
-  const role = result.user.role as AppRole;
-  return { user: { ...result.user, role } };
-}
+import { DRIVER_ROUTE_TAG } from "@/lib/cache-tags";
 
 export async function getAssignedRouteAction() {
   const session = await getSession();
   return service.getAssignedRoute(session);
+}
+
+export async function completeDeliveryAction(routeStopId: string, notes?: string) {
+  const session = await getSession();
+  const result = await service.completeDelivery(session, routeStopId, notes);
+  revalidateTag(DRIVER_ROUTE_TAG, "max");
+  return result;
+}
+
+export async function skipDeliveryAction(routeStopId: string, skipReason: string, notes?: string) {
+  const session = await getSession();
+  const result = await service.skipDelivery(session, routeStopId, skipReason, notes);
+  revalidateTag(DRIVER_ROUTE_TAG, "max");
+  return result;
+}
+
+export async function markNotRequiredAction(routeStopId: string, notes?: string) {
+  const session = await getSession();
+  const result = await service.markNotRequired(session, routeStopId, notes);
+  revalidateTag(DRIVER_ROUTE_TAG, "max");
+  return result;
+}
+
+export async function finishRouteAction() {
+  const session = await getSession();
+  const result = await service.finishRoute(session);
+  revalidateTag(DRIVER_ROUTE_TAG, "max");
+  return result;
 }

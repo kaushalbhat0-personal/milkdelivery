@@ -1,0 +1,1 @@
+CREATE INDEX "users_tenant_role_deleted_idx" ON "users" USING btree ("tenant_id","role","deleted_at");

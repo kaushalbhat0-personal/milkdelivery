@@ -4,7 +4,7 @@ export const createRouteSchema = z.object({
   name: z.string().min(1, "Name is required").max(255),
   description: z.string().optional(),
   zone: z.string().optional(),
-  driverId: z.string().optional(),
+  driverId: z.string().optional().nullable().transform(val => val === "" ? null : val),
 });
 
 export const updateRouteSchema = createRouteSchema.partial();

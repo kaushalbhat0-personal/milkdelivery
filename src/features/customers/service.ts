@@ -2,6 +2,7 @@ import { getTenantId } from "@/lib/tenant";
 import { requireAdmin } from "@/lib/auth-guards";
 import type { Session } from "@/lib/auth-guards";
 import * as queries from "./queries";
+import type { NewCustomerRow } from "./queries";
 import {
   createCustomerSchema,
   updateCustomerSchema,
@@ -37,7 +38,7 @@ export async function createCustomer(session: Session, input: CreateCustomerInpu
 
   const data = createCustomerSchema.parse(input);
 
-  return queries.createCustomerQuery({
+  const updateData: Record<string, unknown> = {
     name: data.name,
     phone: data.phone,
     address: data.address,
@@ -48,13 +49,28 @@ export async function createCustomer(session: Session, input: CreateCustomerInpu
     latitude: data.latitude?.toString(),
     longitude: data.longitude?.toString(),
     isActive: data.isActive,
+    deliveryType: data.deliveryType,
+    quantity: data.quantity.toString(),
+    unit: data.unit,
+    deliveryStartDate: data.deliveryType === "ALTERNATE_DAYS" ? (data.deliveryStartDate ?? null) : null,
     tenantId,
-  });
+  };
+
+  if (data.deliveryType === "CUSTOM_DAYS") {
+    updateData.deliveryDays = data.deliveryDays ?? [];
+  }
+
+  if (data.deliveryType === "PAUSED") {
+    updateData.pauseFrom = data.pauseFrom ?? null;
+    updateData.pauseUntil = data.pauseUntil ?? null;
+  }
+
+  return queries.createCustomerQuery(updateData as NewCustomerRow);
 }
 
 export async function updateCustomer(session: Session, id: string, input: UpdateCustomerInput) {
-  requireAdmin(session);
-  const tenantId = getTenantId(session);
+  const user = requireAdmin(session);
+  const tenantId = user.tenantId;
 
   const existing = await queries.getCustomerByIdQuery(id, tenantId);
   if (!existing) {
@@ -63,7 +79,7 @@ export async function updateCustomer(session: Session, id: string, input: Update
 
   const data = updateCustomerSchema.parse(input);
 
-  const updateData: Record<string, unknown> = {};
+  const updateData: Record<string, unknown> = { updatedBy: user.id };
   const fields: (keyof typeof data)[] = [
     "name", "phone", "address", "placeId", "formattedAddress",
     "landmark", "notes", "isActive",
@@ -75,6 +91,28 @@ export async function updateCustomer(session: Session, id: string, input: Update
   }
   if (data.latitude !== undefined) updateData.latitude = data.latitude.toString();
   if (data.longitude !== undefined) updateData.longitude = data.longitude.toString();
+  if (data.deliveryType !== undefined) {
+    updateData.deliveryType = data.deliveryType;
+    if (data.deliveryType === "CUSTOM_DAYS") {
+      updateData.deliveryDays = data.deliveryDays ?? [];
+    } else {
+      updateData.deliveryDays = null;
+    }
+    if (data.deliveryType === "PAUSED") {
+      updateData.pauseFrom = data.pauseFrom ?? null;
+      updateData.pauseUntil = data.pauseUntil ?? null;
+    } else {
+      updateData.pauseFrom = null;
+      updateData.pauseUntil = null;
+    }
+  }
+  if (data.quantity !== undefined) updateData.quantity = data.quantity.toString();
+  if (data.unit !== undefined) updateData.unit = data.unit;
+  if (data.deliveryStartDate !== undefined) {
+    updateData.deliveryStartDate = data.deliveryStartDate || null;
+  } else if (data.deliveryType === "ALTERNATE_DAYS" && !data.deliveryStartDate) {
+    updateData.deliveryStartDate = existing.createdAt.toISOString().split("T")[0];
+  }
 
   const updated = await queries.updateCustomerQuery(id, tenantId, updateData);
   if (!updated) {

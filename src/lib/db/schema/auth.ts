@@ -1,4 +1,4 @@
-import { pgTable, text, uuid, boolean, timestamp } from "drizzle-orm/pg-core";
+import { pgTable, text, uuid, boolean, timestamp, index } from "drizzle-orm/pg-core";
 import { tenants } from "./tenants";
 
 export const users = pgTable("users", {
@@ -18,7 +18,9 @@ export const users = pgTable("users", {
   createdAt: timestamp("created_at").notNull(),
   updatedAt: timestamp("updated_at").notNull(),
   deletedAt: timestamp("deleted_at"),
-});
+}, (table) => [
+  index("users_tenant_role_deleted_idx").on(table.tenantId, table.role, table.deletedAt),
+]);
 
 export const sessions = pgTable("sessions", {
   id: text("id").primaryKey(),

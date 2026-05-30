@@ -298,6 +298,14 @@ function AddCustomerDialog({
             customerName: customer.name,
             customerPhone: customer.phone,
             customerAddress: customer.address,
+            deliveryType: customer.deliveryType,
+            quantity: customer.quantity,
+            unit: customer.unit,
+            deliveryDays: customer.deliveryDays,
+            pauseFrom: customer.pauseFrom,
+            pauseUntil: customer.pauseUntil,
+            deliveryStartDate: customer.deliveryStartDate ?? null,
+            customerCreatedAt: customer.createdAt,
           }
           onAdded(newStop)
         } catch (error) {

@@ -18,6 +18,14 @@ export type RouteStopWithCustomer = typeof routeStops.$inferSelect & {
   customerName: string;
   customerPhone: string | null;
   customerAddress: string;
+  deliveryType: string;
+  quantity: string | null;
+  unit: string | null;
+  deliveryDays: string[] | null;
+  pauseFrom: string | null;
+  pauseUntil: string | null;
+  deliveryStartDate: string | null;
+  customerCreatedAt: Date;
 };
 
 function routeScope(tenantId: string) {
@@ -61,6 +69,8 @@ export async function getRoutesQuery(
       zone: routes.zone,
       driverId: routes.driverId,
       isActive: routes.isActive,
+      completedAt: routes.completedAt,
+      completedBy: routes.completedBy,
       createdBy: routes.createdBy,
       updatedBy: routes.updatedBy,
       createdAt: routes.createdAt,
@@ -94,6 +104,8 @@ export async function getRouteByIdQuery(id: string, tenantId: string) {
       zone: routes.zone,
       driverId: routes.driverId,
       isActive: routes.isActive,
+      completedAt: routes.completedAt,
+      completedBy: routes.completedBy,
       createdBy: routes.createdBy,
       updatedBy: routes.updatedBy,
       createdAt: routes.createdAt,
@@ -120,31 +132,42 @@ export async function getRouteByIdQuery(id: string, tenantId: string) {
   return row ?? null;
 }
 
-export async function getRouteStopsQuery(routeId: string, tenantId: string) {
-  return db
-    .select({
-      id: routeStops.id,
-      tenantId: routeStops.tenantId,
-      routeId: routeStops.routeId,
-      customerId: routeStops.customerId,
-      sortOrder: routeStops.sortOrder,
-      createdAt: routeStops.createdAt,
-      updatedAt: routeStops.updatedAt,
-      deletedAt: routeStops.deletedAt,
-      customerName: customers.name,
-      customerPhone: customers.phone,
-      customerAddress: customers.address,
-    })
-    .from(routeStops)
-    .innerJoin(customers, eq(routeStops.customerId, customers.id))
-    .where(
-      and(
-        eq(routeStops.routeId, routeId),
-        tenantFilter(routeStops, tenantId),
-        isNull(routeStops.deletedAt),
-      )
+const routeStopsStmt = db
+  .select({
+    id: routeStops.id,
+    tenantId: routeStops.tenantId,
+    routeId: routeStops.routeId,
+    customerId: routeStops.customerId,
+    sortOrder: routeStops.sortOrder,
+    createdAt: routeStops.createdAt,
+    updatedAt: routeStops.updatedAt,
+    deletedAt: routeStops.deletedAt,
+    customerName: customers.name,
+    customerPhone: customers.phone,
+    customerAddress: customers.address,
+    deliveryType: customers.deliveryType,
+    quantity: customers.quantity,
+    unit: customers.unit,
+    deliveryDays: customers.deliveryDays,
+    pauseFrom: customers.pauseFrom,
+    pauseUntil: customers.pauseUntil,
+    deliveryStartDate: customers.deliveryStartDate,
+    customerCreatedAt: customers.createdAt,
+  })
+  .from(routeStops)
+  .innerJoin(customers, eq(routeStops.customerId, customers.id))
+  .where(
+    and(
+      eq(routeStops.routeId, sql.placeholder("routeId")),
+      eq(routeStops.tenantId, sql.placeholder("tenantId")),
+      isNull(routeStops.deletedAt),
     )
-    .orderBy(asc(routeStops.sortOrder));
+  )
+  .orderBy(asc(routeStops.sortOrder))
+  .prepare("route_stops_with_customers");
+
+export async function getRouteStopsQuery(routeId: string, tenantId: string) {
+  return routeStopsStmt.execute({ routeId, tenantId });
 }
 
 export async function createRouteQuery(data: typeof routes.$inferInsert) {

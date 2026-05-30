@@ -44,18 +44,14 @@ declare global {
 }
 
 function useGoogleMapsScript() {
-  const [state, setState] = useState<"loading" | "ready" | "error">(
-    API_KEY ? "loading" : "error"
-  );
+  const [state, setState] = useState<"loading" | "ready" | "error">(() => {
+    if (!API_KEY) return "error";
+    if (typeof window !== "undefined" && window.google?.maps?.places) return "ready";
+    return "loading";
+  });
 
   useEffect(() => {
-    if (!API_KEY) {
-      return;
-    }
-    if (window.google?.maps?.places) {
-      setState("ready");
-      return;
-    }
+    if (!API_KEY) return;
 
     const existing = document.querySelector<HTMLScriptElement>(
       'script[src*="maps.googleapis.com/maps/api/js"]'
@@ -107,7 +103,7 @@ export function AddressAutocomplete({
   ...inputProps
 }: AddressAutocompleteProps) {
   const mapsState = useGoogleMapsScript();
-  const [inputValue, setInputValue] = useState(value);
+  const [editingValue, setEditingValue] = useState<string | null>(null);
   const [predictions, setPredictions] = useState<Prediction[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
@@ -118,11 +114,8 @@ export function AddressAutocomplete({
    const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const autocompleteServiceRef = useRef<google.maps.places.AutocompleteService | null>(null);
 
-  const hasValue = value.length > 0;
-
-  useEffect(() => {
-    setInputValue(value);
-  }, [value]);
+  const inputValue = editingValue ?? value;
+  const hasValue = inputValue.length > 0;
 
   useEffect(() => {
     if (mapsState !== "ready") return;
@@ -196,7 +189,7 @@ export function AddressAutocomplete({
             place
           ) {
             const address = place.formatted_address ?? "";
-            setInputValue(address);
+            setEditingValue(address);
             setPredictions([]);
             onChange({
               placeId: place.place_id ?? placeId,
@@ -213,7 +206,7 @@ export function AddressAutocomplete({
 
   function handleInputChange(e: React.ChangeEvent<HTMLInputElement>) {
     const val = e.target.value;
-    setInputValue(val);
+    setEditingValue(val);
     setSelectedPlaceId(null);
     onInputChange?.(val);
     if (!val) {

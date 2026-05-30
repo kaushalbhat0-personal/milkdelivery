@@ -15,12 +15,21 @@ import type { CustomerRow } from "@/features/customers/queries"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Card, CardContent } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { AddressAutocomplete } from "@/components/shared/address-autocomplete"
 
 interface CustomerFormProps {
   initialData?: CustomerRow
 }
+
+const WEEKDAYS = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"] as const;
 
 export function CustomerForm({ initialData }: CustomerFormProps) {
   const router = useRouter()
@@ -46,9 +55,19 @@ export function CustomerForm({ initialData }: CustomerFormProps) {
       latitude: initialData?.latitude ? Number(initialData.latitude) : undefined,
       longitude: initialData?.longitude ? Number(initialData.longitude) : undefined,
       isActive: initialData?.isActive ?? true,
+      deliveryType: (initialData?.deliveryType as CreateCustomerInput["deliveryType"]) ?? "DAILY",
+      quantity: initialData?.quantity ? Number(initialData.quantity) : 1,
+      unit: (initialData?.unit as CreateCustomerInput["unit"]) ?? "LITER",
+      deliveryDays: initialData?.deliveryDays
+        ? (initialData.deliveryDays as CreateCustomerInput["deliveryDays"])
+        : [],
+      pauseFrom: initialData?.pauseFrom ?? undefined,
+      pauseUntil: initialData?.pauseUntil ?? undefined,
+      deliveryStartDate: initialData?.deliveryStartDate ?? undefined,
     },
   })
 
+  const deliveryType = watch("deliveryType")
   const selectedPlaceId = watch("placeId")
   const selectedLat = watch("latitude")
   const selectedLng = watch("longitude")
@@ -72,6 +91,8 @@ export function CustomerForm({ initialData }: CustomerFormProps) {
       }
     })
   }
+
+  const selectedDays = watch("deliveryDays") ?? [];
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
@@ -154,6 +175,146 @@ export function CustomerForm({ initialData }: CustomerFormProps) {
             />
             <Label htmlFor="isActive">Active</Label>
           </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Delivery Plan</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+            <div className="space-y-2">
+              <Label htmlFor="deliveryType">Delivery Type</Label>
+              <Select
+                defaultValue={initialData?.deliveryType ?? "DAILY"}
+                onValueChange={(value) => {
+                  setValue("deliveryType", value as CreateCustomerInput["deliveryType"], { shouldValidate: true });
+                }}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="DAILY">Daily</SelectItem>
+                  <SelectItem value="ALTERNATE_DAYS">Alternate Days</SelectItem>
+                  <SelectItem value="CUSTOM_DAYS">Custom Days</SelectItem>
+                  <SelectItem value="PAUSED">Paused</SelectItem>
+                </SelectContent>
+              </Select>
+              {errors.deliveryType && (
+                <p className="text-sm text-destructive">{errors.deliveryType.message}</p>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="quantity">Quantity</Label>
+              <Input
+                id="quantity"
+                type="number"
+                step="0.5"
+                min="0.5"
+                {...register("quantity", { setValueAs: (v) => (v === "" ? undefined : Number(v)) })}
+              />
+              {errors.quantity && (
+                <p className="text-sm text-destructive">{errors.quantity.message}</p>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="unit">Unit</Label>
+              <Select
+                defaultValue={initialData?.unit ?? "LITER"}
+                onValueChange={(value) => {
+                  setValue("unit", value as CreateCustomerInput["unit"], { shouldValidate: true });
+                }}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select unit" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="LITER">Litre</SelectItem>
+                  <SelectItem value="ML">Millilitre</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          {deliveryType === "CUSTOM_DAYS" && (
+            <div className="space-y-2">
+              <Label>Delivery Days</Label>
+              <div className="flex flex-wrap gap-2">
+                {WEEKDAYS.map((day) => (
+                  <button
+                    key={day}
+                    type="button"
+                    onClick={() => {
+                      const current = selectedDays;
+                      const updated = current.includes(day)
+                        ? current.filter((d) => d !== day)
+                        : [...current, day];
+                      setValue("deliveryDays" as const, updated as CreateCustomerInput["deliveryDays"], { shouldValidate: true });
+                    }}
+                    className={`rounded-md border px-3 py-1.5 text-sm font-medium transition-colors ${
+                      selectedDays.includes(day)
+                        ? "border-primary bg-primary/10 text-primary"
+                        : "border-input text-muted-foreground hover:bg-accent"
+                    }`}
+                  >
+                    {day}
+                  </button>
+                ))}
+              </div>
+              {errors.deliveryDays && (
+                <p className="text-sm text-destructive">
+                  {(errors.deliveryDays?.message as string) ?? "Select at least one day"}
+                </p>
+              )}
+            </div>
+          )}
+
+          {deliveryType === "ALTERNATE_DAYS" && (
+            <div className="space-y-2">
+              <Label htmlFor="deliveryStartDate">Delivery Start Date *</Label>
+              <Input
+                id="deliveryStartDate"
+                type="date"
+                {...register("deliveryStartDate")}
+              />
+              {errors.deliveryStartDate && (
+                <p className="text-sm text-destructive">{errors.deliveryStartDate.message}</p>
+              )}
+              {!initialData?.deliveryStartDate && (
+                <p className="text-xs text-muted-foreground">
+                  Set the date from which alternate-day delivery should start. Defaults to today.
+                </p>
+              )}
+            </div>
+          )}
+
+          {deliveryType === "PAUSED" && (
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="pauseFrom">Pause From *</Label>
+                <Input
+                  id="pauseFrom"
+                  type="date"
+                  {...register("pauseFrom")}
+                />
+                {errors.pauseFrom && (
+                  <p className="text-sm text-destructive">{errors.pauseFrom.message}</p>
+                )}
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="pauseUntil">Pause Until</Label>
+                <Input
+                  id="pauseUntil"
+                  type="date"
+                  {...register("pauseUntil")}
+                />
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
 

@@ -16,13 +16,16 @@ export const deliveryLogs = pgTable("delivery_logs", {
     .notNull()
     .references(() => users.id),
   deliveryDate: date("delivery_date").notNull(),
-  completedAt: timestamp("completed_at", { withTimezone: true }).defaultNow().notNull(),
+  status: text("status").notNull().default("PENDING"),
+  skipReason: text("skip_reason"),
   notes: text("notes"),
+  completedAt: timestamp("completed_at", { withTimezone: true }).defaultNow().notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 }, (table) => [
   index("logs_stop_date_idx").on(table.routeStopId, table.deliveryDate),
   index("logs_driver_date_idx").on(table.driverId, table.deliveryDate),
   index("logs_tenant_date_idx").on(table.tenantId, table.deliveryDate),
+  index("logs_status_date_idx").on(table.status, table.deliveryDate),
 ]);
 
 export type DeliveryLog = typeof deliveryLogs.$inferSelect;

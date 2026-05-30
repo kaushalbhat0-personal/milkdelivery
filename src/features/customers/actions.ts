@@ -1,19 +1,10 @@
 "use server";
 
-import { auth } from "@/lib/auth";
-import { headers } from "next/headers";
-import { revalidatePath } from "next/cache";
-import type { Session } from "@/lib/auth-guards";
-import type { AppRole } from "@/config/roles";
+import { revalidateTag } from "next/cache";
+import { getSession } from "@/lib/session";
 import * as service from "./service";
 import type { CreateCustomerInput, UpdateCustomerInput, CustomerSearchInput } from "./schemas";
-
-async function getSession(): Promise<Session> {
-  const result = await auth.api.getSession({ headers: await headers() });
-  if (!result) return null;
-  const role = result.user.role as AppRole;
-  return { user: { ...result.user, role } };
-}
+import { CUSTOMER_TAG } from "@/lib/cache-tags";
 
 export async function getCustomersAction(input: CustomerSearchInput) {
   const session = await getSession();
@@ -28,20 +19,20 @@ export async function getCustomerAction(id: string) {
 export async function createCustomerAction(input: CreateCustomerInput) {
   const session = await getSession();
   const result = await service.createCustomer(session, input);
-  revalidatePath("/customers");
+  revalidateTag(CUSTOMER_TAG, "max");
   return result;
 }
 
 export async function updateCustomerAction(id: string, input: UpdateCustomerInput) {
   const session = await getSession();
   const result = await service.updateCustomer(session, id, input);
-  revalidatePath("/customers");
+  revalidateTag(CUSTOMER_TAG, "max");
   return result;
 }
 
 export async function deleteCustomerAction(id: string) {
   const session = await getSession();
   const result = await service.deleteCustomer(session, id);
-  revalidatePath("/customers");
+  revalidateTag(CUSTOMER_TAG, "max");
   return result;
 }

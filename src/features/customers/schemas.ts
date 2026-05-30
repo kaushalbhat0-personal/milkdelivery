@@ -11,7 +11,16 @@ const customerFields = {
   latitude: z.coerce.number().min(-90).max(90).optional(),
   longitude: z.coerce.number().min(-180).max(180).optional(),
   isActive: z.boolean(),
+  deliveryType: z.enum(["DAILY", "ALTERNATE_DAYS", "CUSTOM_DAYS", "PAUSED"]).default("DAILY"),
+  quantity: z.coerce.number().positive("Quantity must be positive").max(999.99).default(1),
+  unit: z.enum(["LITER", "ML"]).default("LITER"),
+  deliveryDays: z.array(z.enum(["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"])).optional(),
+  pauseFrom: z.string().optional(),
+  pauseUntil: z.string().optional(),
+  deliveryStartDate: z.string().optional(),
 } as const;
+
+const WEEKDAYS = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"] as const;
 
 function requireCoordinates<T extends { address?: string; placeId?: string; latitude?: number; longitude?: number }>(
   data: T,
@@ -30,7 +39,40 @@ function requireCoordinates<T extends { address?: string; placeId?: string; lati
   }
 }
 
-export const createCustomerSchema = z.object(customerFields).superRefine(requireCoordinates);
+function validateDeliveryPlan(
+  data: { deliveryType?: string; deliveryDays?: string[]; pauseFrom?: string; pauseUntil?: string },
+  ctx: z.RefinementCtx
+) {
+  if (data.deliveryType === "CUSTOM_DAYS") {
+    if (!data.deliveryDays || data.deliveryDays.length === 0) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Select at least one delivery day for custom schedule",
+        path: ["deliveryDays"],
+      });
+    }
+    for (const day of data.deliveryDays ?? []) {
+      if (!WEEKDAYS.includes(day as typeof WEEKDAYS[number])) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: `Invalid weekday: ${day}`,
+          path: ["deliveryDays"],
+        });
+      }
+    }
+  }
+  if (data.deliveryType === "PAUSED") {
+    if (!data.pauseFrom) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Pause start date is required",
+        path: ["pauseFrom"],
+      });
+    }
+  }
+}
+
+export const createCustomerSchema = z.object(customerFields).superRefine(requireCoordinates).superRefine(validateDeliveryPlan);
 
 export type CreateCustomerInput = {
   name: string;
@@ -43,9 +85,16 @@ export type CreateCustomerInput = {
   latitude?: number;
   longitude?: number;
   isActive: boolean;
+  deliveryType: "DAILY" | "ALTERNATE_DAYS" | "CUSTOM_DAYS" | "PAUSED";
+  quantity: number;
+  unit: "LITER" | "ML";
+  deliveryDays?: ("MON" | "TUE" | "WED" | "THU" | "FRI" | "SAT" | "SUN")[];
+  pauseFrom?: string;
+  pauseUntil?: string;
+  deliveryStartDate?: string;
 };
 
-export const updateCustomerSchema = z.object(customerFields).partial().superRefine(requireCoordinates);
+export const updateCustomerSchema = z.object(customerFields).partial().superRefine(requireCoordinates).superRefine(validateDeliveryPlan);
 
 export const customerSearchSchema = z.object({
   search: z.string().optional(),

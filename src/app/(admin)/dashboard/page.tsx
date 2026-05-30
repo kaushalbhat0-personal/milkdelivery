@@ -1,53 +1,16 @@
 import Link from "next/link"
-import { count, isNull, eq, and } from "drizzle-orm"
 import { Users, Truck, Route, Plus } from "lucide-react"
 
-import { db } from "@/lib/db"
-import { customers } from "@/lib/db/schema/customers"
-import { users } from "@/lib/db/schema/auth"
-import { routes } from "@/lib/db/schema/routes"
-import { ROLES } from "@/config/roles"
+import { getDashboardCountsAction } from "@/features/dashboard/actions"
 import { getRoutesAction } from "@/features/routes/actions"
 
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 
-async function getCounts() {
-  const [[customerCount], [driverCount], [routeCount]] = await Promise.all([
-    db
-      .select({ total: count() })
-      .from(customers)
-      .where(isNull(customers.deletedAt)),
-    db
-      .select({ total: count() })
-      .from(users)
-      .where(and(eq(users.role, ROLES.DRIVER), isNull(users.deletedAt))),
-    db
-      .select({ total: count() })
-      .from(routes)
-      .where(isNull(routes.deletedAt)),
-  ])
-
-  return {
-    customerCount: customerCount.total,
-    driverCount: driverCount.total,
-    routeCount: routeCount.total,
-  }
-}
-
-async function getRecentRoutes() {
-  try {
-    const result = await getRoutesAction({ page: 1, pageSize: 5 })
-    return result.rows
-  } catch {
-    return []
-  }
-}
-
 export default async function DashboardPage() {
   const [counts, recentRoutes] = await Promise.all([
-    getCounts(),
-    getRecentRoutes(),
+    getDashboardCountsAction(),
+    getRoutesAction({ page: 1, pageSize: 5 }).then((r) => r.rows).catch(() => []),
   ])
 
   return (

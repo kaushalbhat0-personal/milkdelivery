@@ -1,8 +1,9 @@
 import Link from "next/link";
-import { LogOut, Route, Users, Truck, LayoutDashboard } from "lucide-react";
+import { LogOut, Route, Users, Truck, LayoutDashboard, ClipboardCheck } from "lucide-react";
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
+import { getSession } from "@/lib/session";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 
@@ -11,6 +12,7 @@ const navItems = [
   { href: "/customers", label: "Customers", icon: Users },
   { href: "/drivers", label: "Drivers", icon: Truck },
   { href: "/routes", label: "Routes", icon: Route },
+  { href: "/delivery", label: "Today's Delivery", icon: ClipboardCheck },
 ];
 
 async function signOut() {
@@ -22,7 +24,7 @@ async function signOut() {
 }
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
-  const session = await auth.api.getSession({ headers: await headers() });
+  const session = await getSession();
 
   if (!session || session.user.role !== "admin") {
     redirect("/login");

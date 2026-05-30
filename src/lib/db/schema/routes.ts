@@ -13,6 +13,8 @@ export const routes = pgTable("routes", {
   zone: varchar("zone", { length: 255 }),
   driverId: text("driver_id").references(() => users.id),
   isActive: boolean("is_active").default(true).notNull(),
+  completedAt: timestamp("completed_at", { withTimezone: true }),
+  completedBy: text("completed_by").references(() => users.id),
   createdBy: text("created_by").references(() => users.id),
   updatedBy: text("updated_by").references(() => users.id),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),

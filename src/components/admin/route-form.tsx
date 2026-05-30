@@ -111,7 +111,9 @@ export function RouteForm({ initialData }: RouteFormProps) {
             <Label htmlFor="driverId">Assigned Driver</Label>
             <Select
               defaultValue={initialData?.driverId ?? ""}
-              onValueChange={(value) => setValue("driverId", value || undefined)}
+              onValueChange={(value) => {
+                setValue("driverId", value === "" ? null : value);
+              }}
             >
               <SelectTrigger>
                 <SelectValue placeholder="Select a driver (optional)" />

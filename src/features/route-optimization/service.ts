@@ -1,6 +1,7 @@
 import { requireDriver } from "@/lib/auth-guards";
 import type { Session } from "@/lib/auth-guards";
 import { getAssignedRouteQuery } from "@/features/driver-route/queries";
+import { isEligible } from "@/features/delivery-schedule/service";
 import type { OptimizeRouteInput, OptimizedStop, OptimizeRouteResult } from "./types";
 
 const EARTH_RADIUS_KM = 6371;
@@ -47,10 +48,26 @@ export async function optimizeRoute(
     throw new Error("Invalid driver location coordinates");
   }
 
-  const stopsWithCoords: { stop: typeof data.stops[number]; lat: number; lng: number }[] = [];
+  const eligibleStops = data.rawStops.filter((s) =>
+    isEligible({
+      deliveryType: s.deliveryType,
+      quantity: s.quantity,
+      unit: s.unit,
+      deliveryDays: s.deliveryDays,
+      pauseFrom: s.pauseFrom,
+      pauseUntil: s.pauseUntil,
+      deliveryStartDate: s.deliveryStartDate,
+    }).eligible
+  );
+
+  if (eligibleStops.length === 0) {
+    throw new Error("No eligible stops to optimize today");
+  }
+
+  const stopsWithCoords: { stop: typeof eligibleStops[number]; lat: number; lng: number }[] = [];
   const stopsWithoutCoords: { id: string; name: string }[] = [];
 
-  for (const stop of data.stops) {
+  for (const stop of eligibleStops) {
     const hasLat = stop.latitude !== null && stop.latitude !== undefined && stop.latitude !== "";
     const hasLng = stop.longitude !== null && stop.longitude !== undefined && stop.longitude !== "";
     const lat = hasLat ? parseFloat(stop.latitude!) : NaN;

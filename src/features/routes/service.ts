@@ -1,4 +1,4 @@
-import { eq, and, isNull, ne } from "drizzle-orm";
+import { eq, and, inArray, isNull, ne, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { routeStops } from "@/lib/db/schema/route-stops";
 import { routes } from "@/lib/db/schema/routes";
@@ -8,6 +8,7 @@ import { getTenantId } from "@/lib/tenant";
 import { requireAdmin } from "@/lib/auth-guards";
 import type { Session } from "@/lib/auth-guards";
 import { ROLES } from "@/config/roles";
+import { isEligible, normalizeQuantityToLiters } from "@/features/delivery-schedule/service";
 import * as queries from "./queries";
 import {
   createRouteSchema,
@@ -25,6 +26,50 @@ import {
   type ReorderStopsInput,
   type RouteSearchInput,
 } from "./schemas";
+
+function computeSummary(
+  stops: queries.RouteStopWithCustomer[]
+): {
+  eligibleCount: number;
+  totalQuantity: number;
+  breakdown: { quantity: string; unit: string; count: number }[];
+} {
+  let totalQuantityLiters = 0;
+  let eligibleCount = 0;
+  const breakdownMap = new Map<string, { quantity: string; unit: string; count: number }>();
+
+  for (const stop of stops) {
+    const result = isEligible({
+      deliveryType: stop.deliveryType,
+      quantity: stop.quantity,
+      unit: stop.unit,
+      deliveryDays: stop.deliveryDays,
+      pauseFrom: stop.pauseFrom,
+      pauseUntil: stop.pauseUntil,
+      deliveryStartDate: stop.deliveryStartDate,
+    });
+
+    if (!result.eligible) continue;
+    eligibleCount++;
+
+    const q = parseFloat(stop.quantity ?? "0");
+    const u = stop.unit ?? "LITER";
+    totalQuantityLiters += normalizeQuantityToLiters(stop.quantity, stop.unit);
+    const key = `${q}-${u}`;
+    const existing = breakdownMap.get(key);
+    if (existing) {
+      existing.count++;
+    } else {
+      breakdownMap.set(key, { quantity: stop.quantity ?? "0", unit: u, count: 1 });
+    }
+  }
+
+  return {
+    eligibleCount,
+    totalQuantity: Math.round(totalQuantityLiters * 100) / 100,
+    breakdown: Array.from(breakdownMap.values()).sort((a, b) => parseFloat(b.quantity) - parseFloat(a.quantity)),
+  };
+}
 
 async function assertDriverNotAssigned(
   tenantId: string,
@@ -73,8 +118,9 @@ export async function getRoute(session: Session, id: string) {
   }
 
   const stops = await queries.getRouteStopsQuery(id, tenantId);
+  const summary = computeSummary(stops);
 
-  return { ...route, stops };
+  return { ...route, stops, summary };
 }
 
 export async function createRoute(session: Session, input: CreateRouteInput) {
@@ -126,32 +172,35 @@ export async function updateRoute(session: Session, id: string, input: UpdateRou
 
   const data = updateRouteSchema.parse(input);
 
-  if (data.driverId) {
-    const driver = await db
-      .select({ id: users.id })
-      .from(users)
-      .where(
-        and(
-          eq(users.id, data.driverId),
-          eq(users.tenantId, tenantId),
-          eq(users.role, ROLES.DRIVER),
-          isNull(users.deletedAt),
-        )
-      )
-      .limit(1);
-
-    if (!driver.length) {
-      throw new Error("Driver not found or is inactive");
-    }
-
-    await assertDriverNotAssigned(tenantId, data.driverId, id);
-  }
-
   const updateData: Record<string, unknown> = { updatedBy: user.id };
   if (data.name !== undefined) updateData.name = data.name;
   if (data.description !== undefined) updateData.description = data.description ?? null;
   if (data.zone !== undefined) updateData.zone = data.zone ?? null;
-  if (data.driverId !== undefined) updateData.driverId = data.driverId ?? null;
+
+  if (data.driverId !== undefined) {
+    if (data.driverId) {
+      const driver = await db
+        .select({ id: users.id })
+        .from(users)
+        .where(
+          and(
+            eq(users.id, data.driverId),
+            eq(users.tenantId, tenantId),
+            eq(users.role, ROLES.DRIVER),
+            isNull(users.deletedAt),
+          )
+        )
+        .limit(1);
+
+      if (!driver.length) {
+        throw new Error("Driver not found or is inactive");
+      }
+
+      await assertDriverNotAssigned(tenantId, data.driverId, id);
+    }
+
+    updateData.driverId = data.driverId;
+  }
 
   const updated = await queries.updateRouteQuery(id, tenantId, updateData);
   if (!updated) {
@@ -335,32 +384,21 @@ export async function reorderStops(session: Session, routeId: string, input: Reo
   }
 
   const now = new Date();
+  const whenClauses = stopIds.map((id, i) => sql`WHEN ${id} THEN ${i + 1}`);
 
-  for (let i = 0; i < stopIds.length; i++) {
-    await db
-      .update(routeStops)
-      .set({ sortOrder: -(i + 1), updatedAt: now })
-      .where(
-        and(
-          eq(routeStops.id, stopIds[i]),
-          eq(routeStops.routeId, routeId),
-          isNull(routeStops.deletedAt),
-        )
-      );
-  }
-
-  for (let i = 0; i < stopIds.length; i++) {
-    await db
-      .update(routeStops)
-      .set({ sortOrder: i + 1, updatedAt: now })
-      .where(
-        and(
-          eq(routeStops.id, stopIds[i]),
-          eq(routeStops.routeId, routeId),
-          isNull(routeStops.deletedAt),
-        )
-      );
-  }
+  await db
+    .update(routeStops)
+    .set({
+      sortOrder: sql`CASE ${routeStops.id} ${sql.join(whenClauses, sql.raw(" "))} END`,
+      updatedAt: now,
+    })
+    .where(
+      and(
+        inArray(routeStops.id, stopIds),
+        eq(routeStops.routeId, routeId),
+        isNull(routeStops.deletedAt),
+      )
+    );
 
   return queries.getRouteStopsQuery(routeId, tenantId);
 }

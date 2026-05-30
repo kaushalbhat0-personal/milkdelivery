@@ -1,4 +1,4 @@
-import { Truck, MapPin, User } from "lucide-react";
+import { Truck, MapPin, User, Package } from "lucide-react";
 import type { DriverRouteData } from "@/features/driver-route/queries";
 
 type RouteHeaderProps = {
@@ -6,7 +6,7 @@ type RouteHeaderProps = {
 };
 
 export function RouteHeader({ data }: RouteHeaderProps) {
-  const { route, driver, stops } = data;
+  const { route, driver, totalStops, totalQuantity } = data;
 
   return (
     <div className="border-b bg-background px-4 py-4">
@@ -31,9 +31,15 @@ export function RouteHeader({ data }: RouteHeaderProps) {
           )}
         </div>
 
-        <p className="text-sm text-muted-foreground">
-          {stops.length} {stops.length === 1 ? "stop" : "stops"}
-        </p>
+        <div className="flex items-center gap-4 text-sm">
+          <p className="font-medium text-foreground">
+            {totalStops} {totalStops === 1 ? "stop" : "stops"} today
+          </p>
+          <span className="inline-flex items-center gap-1 font-medium text-primary">
+            <Package className="size-3.5" />
+            {totalQuantity} L
+          </span>
+        </div>
       </div>
     </div>
   );
