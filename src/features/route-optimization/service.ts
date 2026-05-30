@@ -37,16 +37,28 @@ export async function optimizeRoute(
   }
 
   const { driverLatitude, driverLongitude } = input;
+
+  if (
+    typeof driverLatitude !== "number" ||
+    typeof driverLongitude !== "number" ||
+    !isFinite(driverLatitude) ||
+    !isFinite(driverLongitude)
+  ) {
+    throw new Error("Invalid driver location coordinates");
+  }
+
   const stopsWithCoords: { stop: typeof data.stops[number]; lat: number; lng: number }[] = [];
-  const stopsWithoutCoords: string[] = [];
+  const stopsWithoutCoords: { id: string; name: string }[] = [];
 
   for (const stop of data.stops) {
-    const lat = stop.latitude ? parseFloat(stop.latitude) : NaN;
-    const lng = stop.longitude ? parseFloat(stop.longitude) : NaN;
+    const hasLat = stop.latitude !== null && stop.latitude !== undefined && stop.latitude !== "";
+    const hasLng = stop.longitude !== null && stop.longitude !== undefined && stop.longitude !== "";
+    const lat = hasLat ? parseFloat(stop.latitude!) : NaN;
+    const lng = hasLng ? parseFloat(stop.longitude!) : NaN;
     if (!isNaN(lat) && !isNaN(lng)) {
       stopsWithCoords.push({ stop, lat, lng });
     } else {
-      stopsWithoutCoords.push(stop.customerName);
+      stopsWithoutCoords.push({ id: stop.id, name: stop.customerName });
     }
   }
 

@@ -1,4 +1,5 @@
-import { pgTable, uuid, varchar, text, boolean, timestamp, index } from "drizzle-orm/pg-core";
+import { pgTable, uuid, varchar, text, boolean, timestamp, index, uniqueIndex } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 import { tenants } from "./tenants";
 import { users } from "./auth";
 
@@ -21,6 +22,11 @@ export const routes = pgTable("routes", {
   index("routes_tenant_active_idx").on(table.tenantId, table.isActive),
   index("routes_tenant_driver_idx").on(table.tenantId, table.driverId),
   index("routes_tenant_deleted_idx").on(table.tenantId, table.deletedAt),
+  uniqueIndex("routes_tenant_driver_active_uniq")
+    .on(table.tenantId, table.driverId)
+    .where(
+      sql`${table.isActive} = true AND ${table.deletedAt} IS NULL`
+    ),
 ]);
 
 export type Route = typeof routes.$inferSelect;

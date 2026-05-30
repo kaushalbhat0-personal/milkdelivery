@@ -15,5 +15,5 @@ export type OptimizedStop = {
 export type OptimizeRouteResult = {
   optimizedStops: OptimizedStop[];
   totalDistance: number;
-  stopsWithoutCoords: string[];
+  stopsWithoutCoords: { id: string; name: string }[];
 };

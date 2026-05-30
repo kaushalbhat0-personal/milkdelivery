@@ -1,6 +1,7 @@
-import { eq, and, isNull } from "drizzle-orm";
+import { eq, and, isNull, ne } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { routeStops } from "@/lib/db/schema/route-stops";
+import { routes } from "@/lib/db/schema/routes";
 import { users } from "@/lib/db/schema/auth";
 import { customers } from "@/lib/db/schema/customers";
 import { getTenantId } from "@/lib/tenant";
@@ -24,6 +25,34 @@ import {
   type ReorderStopsInput,
   type RouteSearchInput,
 } from "./schemas";
+
+async function assertDriverNotAssigned(
+  tenantId: string,
+  driverId: string,
+  excludeRouteId?: string
+) {
+  const conditions = [
+    eq(routes.driverId, driverId),
+    eq(routes.tenantId, tenantId),
+    eq(routes.isActive, true),
+    isNull(routes.deletedAt),
+  ];
+  if (excludeRouteId) {
+    conditions.push(ne(routes.id, excludeRouteId));
+  }
+
+  const [existing] = await db
+    .select({ id: routes.id, name: routes.name })
+    .from(routes)
+    .where(and(...conditions))
+    .limit(1);
+
+  if (existing) {
+    throw new Error(
+      "Driver is already assigned to another active route"
+    );
+  }
+}
 
 export async function getRoutes(session: Session, input: RouteSearchInput) {
   requireAdmin(session);
@@ -71,6 +100,8 @@ export async function createRoute(session: Session, input: CreateRouteInput) {
     if (!driver.length) {
       throw new Error("Driver not found or is inactive");
     }
+
+    await assertDriverNotAssigned(tenantId, data.driverId);
   }
 
   return queries.createRouteQuery({
@@ -112,6 +143,8 @@ export async function updateRoute(session: Session, id: string, input: UpdateRou
     if (!driver.length) {
       throw new Error("Driver not found or is inactive");
     }
+
+    await assertDriverNotAssigned(tenantId, data.driverId, id);
   }
 
   const updateData: Record<string, unknown> = { updatedBy: user.id };
@@ -177,6 +210,8 @@ export async function assignDriver(session: Session, routeId: string, input: Ass
   if (!driver.length) {
     throw new Error("Driver not found or is inactive");
   }
+
+  await assertDriverNotAssigned(tenantId, driverId, routeId);
 
   const updated = await queries.updateRouteQuery(routeId, tenantId, {
     driverId,

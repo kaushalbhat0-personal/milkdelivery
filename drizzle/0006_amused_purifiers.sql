@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX "routes_tenant_driver_active_uniq" ON "routes" USING btree ("tenant_id","driver_id") WHERE "routes"."is_active" = true AND "routes"."deleted_at" IS NULL;

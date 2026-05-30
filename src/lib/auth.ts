@@ -55,7 +55,6 @@ export const auth = betterAuth({
     },
   },
   plugins: [
-    nextCookies(),
     admin({
       roles: {
         admin: ac.newRole({
@@ -68,5 +67,6 @@ export const auth = betterAuth({
         }),
       },
     }),
+    nextCookies(),
   ],
 });

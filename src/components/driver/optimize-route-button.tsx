@@ -5,14 +5,9 @@ import { Loader2, Navigation, Route, MapPin, Crosshair } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { optimizeRouteAction } from "@/features/route-optimization/actions"
-import type { DriverRouteStop } from "@/features/driver-route/queries"
 import type { OptimizeRouteResult } from "@/features/route-optimization/types"
 
-type OptimizeRouteButtonProps = {
-  stops: DriverRouteStop[]
-}
-
-export function OptimizeRouteButton({ stops }: OptimizeRouteButtonProps) {
+export function OptimizeRouteButton() {
   const [result, setResult] = useState<OptimizeRouteResult | null>(null)
   const [optimizing, setOptimizing] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -134,22 +129,20 @@ export function OptimizeRouteButton({ stops }: OptimizeRouteButtonProps) {
             </CardContent>
           </Card>
 
-          {stops.filter((s) => !s.latitude || !s.longitude).length > 0 && (
+          {result.stopsWithoutCoords.length > 0 && (
             <Card>
               <CardHeader className="pb-3">
                 <CardTitle className="text-sm">Unoptimized Stops</CardTitle>
               </CardHeader>
               <CardContent className="space-y-1">
-                {stops
-                  .filter((s) => !s.latitude || !s.longitude)
-                  .map((stop) => (
-                    <div
-                      key={stop.id}
-                      className="rounded-md bg-muted px-2.5 py-1.5 text-xs text-muted-foreground"
-                    >
-                      {stop.customerName}
-                    </div>
-                  ))}
+                {result.stopsWithoutCoords.map((s) => (
+                  <div
+                    key={s.id}
+                    className="rounded-md bg-muted px-2.5 py-1.5 text-xs text-muted-foreground"
+                  >
+                    {s.name}
+                  </div>
+                ))}
               </CardContent>
             </Card>
           )}
